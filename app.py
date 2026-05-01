@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, render_template, redirect, url_for
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
-from models_mongo import User, StudyPlan, Activity, plans_collection
+from models_mongo import User, StudyPlan, Activity
 from parser_mongo import parse_plan_text
 from datetime import datetime, date, timedelta
 from bson import ObjectId

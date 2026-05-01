@@ -8,36 +8,57 @@ import certifi
 # MongoDB connection
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/')
 
+_client = None
+_db = None
+_collections_cache = {}
+
 # Lazy connection - only connect when needed
 def get_db():
-    client = MongoClient(
-        MONGO_URI,
-        serverSelectionTimeoutMS=5000,
-        tlsCAFile=certifi.where(),
-        tls=True,
-        tlsAllowInvalidCertificates=False
-    )
-    return client['study_planner']
+    global _client, _db
+    if _db is None:
+        _client = MongoClient(
+            MONGO_URI,
+            serverSelectionTimeoutMS=5000,
+            tlsCAFile=certifi.where(),
+            tls=True,
+            tlsAllowInvalidCertificates=False
+        )
+        _db = _client['study_planner']
+    return _db
 
-# Initialize collections lazily
-def get_collections():
-    db = get_db()
-    users_collection = db['users']
-    plans_collection = db['plans']
-    activities_collection = db['activities']
+# Get collection with lazy initialization
+def get_collection(name):
+    if name not in _collections_cache:
+        db = get_db()
+        _collections_cache[name] = db[name]
+        
+        # Create indexes on first access
+        if name == 'users':
+            try:
+                _collections_cache[name].create_index('email', unique=True, background=True)
+                _collections_cache[name].create_index('username', unique=True, background=True)
+            except:
+                pass
+        elif name == 'plans':
+            try:
+                _collections_cache[name].create_index('user_id', background=True)
+            except:
+                pass
     
-    # Create indexes only if not exists
-    try:
-        users_collection.create_index('email', unique=True, background=True)
-        users_collection.create_index('username', unique=True, background=True)
-        plans_collection.create_index('user_id', background=True)
-    except:
-        pass  # Indexes might already exist
-    
-    return users_collection, plans_collection, activities_collection
+    return _collections_cache[name]
 
-# Get collections
-users_collection, plans_collection, activities_collection = get_collections()
+# Collection accessors
+@property
+def users_collection():
+    return get_collection('users')
+
+@property
+def plans_collection():
+    return get_collection('plans')
+
+@property  
+def activities_collection():
+    return get_collection('activities')
 
 class User:
     def __init__(self, username, email, password=None, _id=None, created_at=None):
@@ -60,16 +81,18 @@ class User:
             'password': self.password,
             'created_at': self.created_at
         }
+        users_coll = get_collection('users')
         if self.id:
-            users_collection.update_one({'_id': ObjectId(self.id)}, {'$set': user_data})
+            users_coll.update_one({'_id': ObjectId(self.id)}, {'$set': user_data})
         else:
-            result = users_collection.insert_one(user_data)
+            result = users_coll.insert_one(user_data)
             self.id = str(result.inserted_id)
         return self
     
     @staticmethod
     def find_by_email(email):
-        user_data = users_collection.find_one({'email': email})
+        users_coll = get_collection('users')
+        user_data = users_coll.find_one({'email': email})
         if user_data:
             return User(
                 username=user_data['username'],
@@ -82,7 +105,8 @@ class User:
     
     @staticmethod
     def find_by_username(username):
-        user_data = users_collection.find_one({'username': username})
+        users_coll = get_collection('users')
+        user_data = users_coll.find_one({'username': username})
         if user_data:
             return User(
                 username=user_data['username'],
@@ -96,7 +120,8 @@ class User:
     @staticmethod
     def find_by_id(user_id):
         try:
-            user_data = users_collection.find_one({'_id': ObjectId(user_id)})
+            users_coll = get_collection('users')
+            user_data = users_coll.find_one({'_id': ObjectId(user_id)})
             if user_data:
                 return User(
                     username=user_data['username'],
@@ -127,6 +152,7 @@ class User:
 class StudyPlan:
     @staticmethod
     def create(title, subject, description, user_id):
+        plans_coll = get_collection('plans')
         plan_data = {
             'title': title,
             'subject': subject,
@@ -135,40 +161,45 @@ class StudyPlan:
             'created_at': datetime.utcnow(),
             'weeks': []
         }
-        result = plans_collection.insert_one(plan_data)
+        result = plans_coll.insert_one(plan_data)
         return str(result.inserted_id)
     
     @staticmethod
     def find_by_id(plan_id, user_id=None):
         try:
+            plans_coll = get_collection('plans')
             query = {'_id': ObjectId(plan_id)}
             if user_id:
                 query['user_id'] = user_id
-            return plans_collection.find_one(query)
+            return plans_coll.find_one(query)
         except:
             return None
     
     @staticmethod
     def find_by_user(user_id):
-        return list(plans_collection.find({'user_id': user_id}).sort('created_at', -1))
+        plans_coll = get_collection('plans')
+        return list(plans_coll.find({'user_id': user_id}).sort('created_at', -1))
     
     @staticmethod
     def delete(plan_id, user_id):
-        plans_collection.delete_one({'_id': ObjectId(plan_id), 'user_id': user_id})
+        plans_coll = get_collection('plans')
+        plans_coll.delete_one({'_id': ObjectId(plan_id), 'user_id': user_id})
     
     @staticmethod
     def count_by_user(user_id):
-        return plans_collection.count_documents({'user_id': user_id})
+        plans_coll = get_collection('plans')
+        return plans_coll.count_documents({'user_id': user_id})
 
 class Week:
     @staticmethod
     def add_to_plan(plan_id, week_number, title):
+        plans_coll = get_collection('plans')
         week_data = {
             'week_number': week_number,
             'title': title,
             'days': []
         }
-        plans_collection.update_one(
+        plans_coll.update_one(
             {'_id': ObjectId(plan_id)},
             {'$push': {'weeks': week_data}}
         )
@@ -177,20 +208,22 @@ class Week:
 class Day:
     @staticmethod
     def add_to_week(plan_id, week_number, day_data):
-        plans_collection.update_one(
+        plans_coll = get_collection('plans')
+        plans_coll.update_one(
             {'_id': ObjectId(plan_id), 'weeks.week_number': week_number},
             {'$push': {'weeks.$.days': day_data}}
         )
     
     @staticmethod
     def update_status(plan_id, week_number, day_number, status):
+        plans_coll = get_collection('plans')
         update_data = {'weeks.$[week].days.$[day].status': status}
         if status == 'completed':
             update_data['weeks.$[week].days.$[day].completed_at'] = datetime.utcnow()
         else:
             update_data['weeks.$[week].days.$[day].completed_at'] = None
         
-        plans_collection.update_one(
+        plans_coll.update_one(
             {'_id': ObjectId(plan_id)},
             {'$set': update_data},
             array_filters=[
@@ -202,14 +235,19 @@ class Day:
 class Activity:
     @staticmethod
     def create(message, plan_title, user_id):
+        activities_coll = get_collection('activities')
         activity_data = {
             'message': message,
             'plan_title': plan_title,
             'user_id': user_id,
             'created_at': datetime.utcnow()
         }
-        activities_collection.insert_one(activity_data)
+        activities_coll.insert_one(activity_data)
     
     @staticmethod
     def get_recent(user_id, limit=5):
-        return list(activities_collection.find({'user_id': user_id}).sort('created_at', -1).limit(limit))
+        activities_coll = get_collection('activities')
+        return list(activities_coll.find({'user_id': user_id}).sort('created_at', -1).limit(limit))
+
+# Export collection getter for backward compatibility
+plans_collection = get_collection('plans')
