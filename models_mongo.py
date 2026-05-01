@@ -3,21 +3,41 @@ from datetime import datetime
 from bson import ObjectId
 import bcrypt
 import os
+import certifi
 
 # MongoDB connection
 MONGO_URI = os.environ.get('MONGO_URI', 'mongodb://localhost:27017/')
-client = MongoClient(MONGO_URI)
-db = client['study_planner']
 
-# Collections
-users_collection = db['users']
-plans_collection = db['plans']
-activities_collection = db['activities']
+# Lazy connection - only connect when needed
+def get_db():
+    client = MongoClient(
+        MONGO_URI,
+        serverSelectionTimeoutMS=5000,
+        tlsCAFile=certifi.where(),
+        tls=True,
+        tlsAllowInvalidCertificates=False
+    )
+    return client['study_planner']
 
-# Create indexes
-users_collection.create_index('email', unique=True)
-users_collection.create_index('username', unique=True)
-plans_collection.create_index('user_id')
+# Initialize collections lazily
+def get_collections():
+    db = get_db()
+    users_collection = db['users']
+    plans_collection = db['plans']
+    activities_collection = db['activities']
+    
+    # Create indexes only if not exists
+    try:
+        users_collection.create_index('email', unique=True, background=True)
+        users_collection.create_index('username', unique=True, background=True)
+        plans_collection.create_index('user_id', background=True)
+    except:
+        pass  # Indexes might already exist
+    
+    return users_collection, plans_collection, activities_collection
+
+# Get collections
+users_collection, plans_collection, activities_collection = get_collections()
 
 class User:
     def __init__(self, username, email, password=None, _id=None, created_at=None):
