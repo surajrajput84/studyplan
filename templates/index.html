@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Planner — Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📘</div>
+    <div>
+      <div class="logo-text">Study Planner</div>
+      <div class="logo-sub">Track your progress</div>
+    </div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+    <a href="/" class="nav-item active"><span class="ni">🏠</span> Dashboard</a>
+    <a href="/all-plans" class="nav-item"><span class="ni">📚</span> My Plans</a>
+    <a href="/all-calendar" class="nav-item"><span class="ni">📅</span> Calendar</a>
+    <a href="/all-progress" class="nav-item"><span class="ni">📊</span> Statistics</a>
+
+    {% if by_subject %}
+    <div class="sidebar-section-label" style="margin-top:12px;">Your Plans</div>
+    {% for subject, plans in by_subject.items() %}
+      {% for plan in plans %}
+      <a href="/plan/{{ plan.id }}/weeks" class="nav-item">
+        <span class="ni">📄</span>
+        {{ plan.title[:20] }}{% if plan.title|length > 20 %}…{% endif %}
+      </a>
+      {% endfor %}
+    {% endfor %}
+    {% endif %}
+
+    <div class="sidebar-section-label" style="margin-top:12px;">Account</div>
+    <a href="#" class="nav-item"><span class="ni">⚙️</span> Settings</a>
+  </nav>
+
+  <div class="sidebar-bottom">
+    <div class="mot-title">🔥 Keep Going!</div>
+    <div class="mot-text">Small steps every day lead to big results. Stay consistent!</div>
+    <div class="mot-bar-bg">
+      <div class="mot-bar-fill" id="mot-fill" style="width:0%"></div>
+    </div>
+    <div class="mot-bar-label" id="mot-label">0%</div>
+  </div>
+</div>
+
+<!-- ── Main Area ── -->
+<div class="main-area">
+
+  <div class="topheader">
+    <div class="topheader-left">
+      <div class="greeting" id="greeting-text">Good morning, {{ username }}! 👋</div>
+      <div class="greeting-sub">Let's stay consistent and achieve your goals.</div>
+    </div>
+    <div class="topheader-right">
+      <div class="icon-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme">🌙</div>
+      <div class="avatar">{{ username[0].upper() }}</div>
+      <a href="/logout" class="btn btn-ghost" style="margin-right:8px;">Logout</a>
+      <a href="/create" class="btn btn-primary">+ Create New Plan</a>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <!-- Stat Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="sc-icon sc-purple">📚</div>
+        <div class="sc-val" id="s-plans">—</div>
+        <div class="sc-label">Total Plans</div>
+        <div class="sc-sub">Active plans</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-icon sc-green">📅</div>
+        <div class="sc-val" id="s-days">—</div>
+        <div class="sc-label">Total Days</div>
+        <div class="sc-sub">Across all plans</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-icon sc-orange">✅</div>
+        <div class="sc-val" id="s-done">—</div>
+        <div class="sc-label">Completed Days</div>
+        <div class="sc-sub">Keep it up!</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-icon sc-blue">📈</div>
+        <div class="sc-val" id="s-pct">—</div>
+        <div class="sc-label">Progress</div>
+        <div class="sc-sub">Overall progress</div>
+      </div>
+    </div>
+
+    <!-- Two Column -->
+    <div class="two-col">
+
+      <!-- Left Column -->
+      <div>
+        <div class="section-title">
+          Your Study Plans
+          <a href="/create">+ Add New</a>
+        </div>
+        <div id="plans-list"></div>
+        <a href="/create" class="plan-card-new">
+          <div class="pc-icon">➕</div> Create New Plan
+        </a>
+
+        <div class="section-title" style="margin-top:24px;">
+          Recent Activity
+          <a href="#" id="view-all-link">View all →</a>
+        </div>
+        <div class="card" style="padding:16px 18px;">
+          <div id="activity-feed">
+            <p class="empty">No activity yet. Start completing days!</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div>
+        <!-- Today's Plan -->
+        <div class="widget-card">
+          <div class="widget-title">
+            Today's Plan
+            <span id="today-date"></span>
+          </div>
+          <div id="today-content">
+            <div class="today-day-label" id="today-day">—</div>
+            <div class="today-topic" id="today-topic">No plan scheduled for today</div>
+            <div id="today-tag-wrap" style="margin-bottom:14px;"></div>
+            <button id="today-btn" class="btn btn-primary"
+              style="width:100%;justify-content:center;" onclick="markTodayComplete()">
+              Start Now →
+            </button>
+          </div>
+        </div>
+
+        <!-- Mini Calendar -->
+        <div class="widget-card">
+          <div class="widget-title">
+            <span id="cal-month-label"></span>
+            <div style="display:flex;gap:4px;">
+              <button class="cal-nav" onclick="changeMonth(-1)">‹</button>
+              <button class="cal-nav" onclick="changeMonth(1)">›</button>
+            </div>
+          </div>
+          <div class="cal-grid" id="cal-grid"></div>
+        </div>
+      </div>
+
+    </div><!-- /two-col -->
+  </div><!-- /page-content -->
+</div><!-- /main-area -->
+
+<script>
+// ── State ─────────────────────────────────────────────
+let dashData      = null;
+let todayDayData  = null;
+const now         = new Date();
+let calYear       = now.getFullYear();
+let calMonth      = now.getMonth();
+
+const MONTHS = ['January','February','March','April','May','June',
+                'July','August','September','October','November','December'];
+const DOWS   = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const COLORS = ['sc-blue','sc-purple','sc-green','sc-orange'];
+const ICONS  = ['💻','🧩','🌐','⚙️'];
+
+// ── Greeting ──────────────────────────────────────────
+const h = now.getHours();
+document.getElementById('greeting-text').textContent =
+  `${h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'}, {{ username }}! 👋`;
+document.getElementById('today-date').textContent =
+  now.toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'});
+
+// ── Load everything ───────────────────────────────────
+async function loadDashboard() {
+  const res  = await fetch('/dashboard-data');
+  dashData   = await res.json();
+  renderStats(dashData.stats);
+  renderPlans(dashData.plans);
+  renderTodayPlan(dashData.today_day);
+  renderActivity(dashData.activities);
+  renderCalendar(dashData.completed_dates);
+  // sidebar motivational bar
+  document.getElementById('mot-fill').style.width  = dashData.stats.percent + '%';
+  document.getElementById('mot-label').textContent = dashData.stats.percent + '%';
+}
+
+// ── Stats ─────────────────────────────────────────────
+function renderStats(s) {
+  document.getElementById('s-plans').textContent = s.plans;
+  document.getElementById('s-days').textContent  = s.total_days;
+  document.getElementById('s-done').textContent  = s.completed;
+  document.getElementById('s-pct').textContent   = s.percent + '%';
+}
+
+// ── Plans ─────────────────────────────────────────────
+function renderPlans(plans) {
+  const el = document.getElementById('plans-list');
+  if (!plans.length) {
+    el.innerHTML = `<div style="text-align:center;padding:28px 0;">
+      <div style="font-size:38px;margin-bottom:8px;">📭</div>
+      <div style="font-weight:600;margin-bottom:4px;">No plans yet</div>
+      <p class="empty">Create your first study plan to get started</p>
+    </div>`;
+    return;
+  }
+  el.innerHTML = plans.map((p, i) => `
+    <div class="plan-card" style="cursor:default;">
+      <div class="pc-icon ${COLORS[i % 4]}">${ICONS[i % 4]}</div>
+      <div class="pc-body">
+        <div class="pc-title">${p.title}</div>
+        <div class="pc-sub">${p.subject} · ${p.description || p.created_at}</div>
+        <div class="prog-wrap">
+          <div class="prog-bg"><div class="prog-fill" style="width:${p.percent}%"></div></div>
+          <div class="prog-pct">${p.percent}%</div>
+        </div>
+        <div class="plan-card-actions">
+          <a href="/plan/${p.id}/weeks" class="btn btn-primary btn-sm">Open →</a>
+          <a href="/plan/${p.id}/dashboard" class="btn btn-ghost btn-sm">📊 Stats</a>
+          <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id},'${p.title.replace(/'/g,"\\'")}')">🗑</button>
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+// ── Today's Plan ──────────────────────────────────────
+function renderTodayPlan(day) {
+  todayDayData = day;
+  const btn    = document.getElementById('today-btn');
+
+  if (!day) {
+    document.getElementById('today-day').textContent   = '—';
+    document.getElementById('today-topic').textContent = 'No plan scheduled for today';
+    document.getElementById('today-tag-wrap').innerHTML = '';
+    btn.textContent = 'No task today';
+    btn.disabled    = true;
+    btn.style.opacity = '.5';
+    return;
+  }
+
+  const dayLabel = day.title.match(/Day\s+\d+/i)?.[0] || `Day ${day.day_number}`;
+  const topic    = day.title.replace(/Day\s+\d+\s*[–\-]?\s*/i, '');
+
+  document.getElementById('today-day').textContent   = dayLabel;
+  document.getElementById('today-topic').textContent = topic;
+  document.getElementById('today-tag-wrap').innerHTML =
+    `<span class="today-tag">${day.plan_title}</span>`;
+
+  if (day.status === 'completed') {
+    btn.textContent   = '✅ Completed';
+    btn.disabled      = true;
+    btn.style.background = 'var(--green)';
+  } else {
+    btn.textContent  = 'Start Now →';
+    btn.disabled     = false;
+    btn.style.background = '';
+    btn.style.opacity    = '1';
+  }
+}
+
+// ── Mark today complete ───────────────────────────────
+async function markTodayComplete() {
+  if (!todayDayData || todayDayData.status === 'completed') return;
+  const btn = document.getElementById('today-btn');
+  btn.textContent = 'Saving…';
+  btn.disabled    = true;
+
+  await fetch(`/day/${todayDayData.day_id}`, {
+    method: 'PUT',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({status: 'completed'})
+  });
+
+  // reload everything so stats, calendar, activity all update
+  await loadDashboard();
+}
+
+// ── Activity Feed ─────────────────────────────────────
+function renderActivity(activities) {
+  const el = document.getElementById('activity-feed');
+  if (!activities.length) {
+    el.innerHTML = `<p class="empty">No activity yet. Start completing days!</p>`;
+    return;
+  }
+  el.innerHTML = activities.map(a => `
+    <div class="activity-item">
+      <div class="act-icon">✓</div>
+      <div class="act-body">
+        <div class="act-text">${a.message}</div>
+        <div class="act-sub">${a.plan}</div>
+      </div>
+      <div class="act-time">${a.time}</div>
+    </div>`).join('');
+}
+
+// ── Calendar ──────────────────────────────────────────
+function renderCalendar(completedDates = []) {
+  const datesSet = new Set(completedDates);
+  const todayStr = now.toISOString().slice(0, 10);
+
+  document.getElementById('cal-month-label').textContent =
+    `${MONTHS[calMonth]} ${calYear}`;
+
+  const first = new Date(calYear, calMonth, 1).getDay();
+  const total = new Date(calYear, calMonth + 1, 0).getDate();
+
+  let html = DOWS.map(d => `<div class="cal-dow">${d}</div>`).join('');
+  for (let i = 0; i < first; i++) html += `<div class="cal-day empty"></div>`;
+  for (let d = 1; d <= total; d++) {
+    const iso     = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = iso === todayStr;
+    const isDone  = datesSet.has(iso);
+    html += `<div class="cal-day${isToday ? ' today' : ''}${isDone ? ' done' : ''}">${d}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML = html;
+}
+
+function changeMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar(dashData?.completed_dates || []);
+}
+
+// ── Delete plan ───────────────────────────────────────
+async function deletePlan(id, title) {
+  if (!confirm(`Delete "${title}"?\n\nAll weeks and days will be permanently removed.`)) return;
+  await fetch(`/plan/${id}`, {method: 'DELETE'});
+  location.reload();
+}
+
+// ── Init ──────────────────────────────────────────────
+loadDashboard();
+</script>
+</body>
+</html>

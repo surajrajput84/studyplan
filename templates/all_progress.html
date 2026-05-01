@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Overall Progress — Study Planner</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📘</div>
+    <div>
+      <div class="logo-text">Study Planner</div>
+      <div class="logo-sub">Track your progress</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+    <a href="/" class="nav-item"><span class="ni">🏠</span> Dashboard</a>
+    <a href="/all-plans" class="nav-item"><span class="ni">📚</span> My Plans</a>
+    <a href="/all-calendar" class="nav-item"><span class="ni">📅</span> Calendar</a>
+    <a href="/all-progress" class="nav-item active"><span class="ni">📊</span> Statistics</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">Account</div>
+    <a href="/logout" class="nav-item"><span class="ni">🚪</span> Logout</a>
+  </nav>
+</div>
+
+<div class="main-area">
+  <div class="topheader">
+    <div class="topheader-left">
+      <div class="greeting">Overall Progress 📊</div>
+      <div class="greeting-sub">Your complete learning statistics</div>
+    </div>
+  </div>
+
+  <div class="page-content">
+    
+    <div class="stat-row">
+      <div class="stat-box"><div class="val" id="s-plans">—</div><div class="lbl">Total Plans</div></div>
+      <div class="stat-box"><div class="val" id="s-total">—</div><div class="lbl">Total Days</div></div>
+      <div class="stat-box"><div class="val" id="s-done">—</div><div class="lbl">Completed</div></div>
+      <div class="stat-box"><div class="val" id="s-pct">—</div><div class="lbl">Progress</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Overall Progress</h2></div>
+      <div class="progress-wrap">
+        <div class="progress-bg">
+          <div class="progress-fill" id="overall-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-label" id="overall-label"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Progress by Plan</h2></div>
+      <div id="plans-progress"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+async function load() {
+  const res = await fetch('/dashboard-data');
+  const data = await res.json();
+
+  document.getElementById('s-plans').textContent = data.stats.plans;
+  document.getElementById('s-total').textContent = data.stats.total_days;
+  document.getElementById('s-done').textContent = data.stats.completed;
+  document.getElementById('s-pct').textContent = data.stats.percent + '%';
+  document.getElementById('overall-bar').style.width = data.stats.percent + '%';
+  document.getElementById('overall-label').textContent = 
+    `${data.stats.completed} of ${data.stats.total_days} days completed (${data.stats.percent}%)`;
+
+  const container = document.getElementById('plans-progress');
+  
+  if (!data.plans.length) {
+    container.innerHTML = '<p class="empty">No plans yet</p>';
+    return;
+  }
+
+  container.innerHTML = data.plans.map(p => `
+    <div style="padding:16px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <div>
+          <div style="font-weight:600;font-size:15px;">${p.title}</div>
+          <div style="font-size:13px;color:var(--text-3);margin-top:2px;">
+            <span class="subject-tag">${p.subject}</span> · ${p.total} days
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:20px;font-weight:700;color:var(--blue);">${p.percent}%</div>
+          <div style="font-size:12px;color:var(--text-3);">${p.completed}/${p.total}</div>
+        </div>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bg">
+          <div class="progress-fill" style="width:${p.percent}%"></div>
+        </div>
+      </div>
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        <a href="/plan/${p.id}/weeks" class="btn btn-primary btn-sm">Open →</a>
+        <a href="/plan/${p.id}/dashboard" class="btn btn-ghost btn-sm">View Details</a>
+      </div>
+    </div>
+  `).join('');
+}
+
+load();
+</script>
+</body>
+</html>

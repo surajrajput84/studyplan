@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Create Plan — Study Planner</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+  <style>
+    /* ── Chatbot styles ── */
+    .chat-window {
+      display: flex; flex-direction: column;
+      height: 420px; border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--bg); overflow: hidden;
+    }
+    .chat-messages {
+      flex: 1; overflow-y: auto; padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .msg { display: flex; gap: 10px; align-items: flex-end; max-width: 85%; }
+    .msg.bot  { align-self: flex-start; }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+
+    .msg-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; flex-shrink: 0;
+    }
+    .msg.bot  .msg-avatar { background: linear-gradient(135deg,#4F6EF7,#8b5cf6); }
+    .msg.user .msg-avatar { background: var(--blue-light); color: var(--blue); font-weight:700; }
+
+    .msg-bubble {
+      padding: 10px 14px; border-radius: 14px;
+      font-size: 13px; line-height: 1.55; white-space: pre-wrap;
+    }
+    .msg.bot  .msg-bubble {
+      background: var(--surface); border: 1px solid var(--border);
+      border-bottom-left-radius: 4px; color: var(--text);
+    }
+    .msg.user .msg-bubble {
+      background: var(--blue); color: #fff;
+      border-bottom-right-radius: 4px;
+    }
+
+    .typing-indicator { display: flex; gap: 4px; padding: 10px 14px; }
+    .typing-indicator span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-3); animation: bounce .9s infinite;
+    }
+    .typing-indicator span:nth-child(2) { animation-delay: .15s; }
+    .typing-indicator span:nth-child(3) { animation-delay: .30s; }
+    @keyframes bounce {
+      0%,60%,100% { transform: translateY(0); }
+      30%          { transform: translateY(-6px); }
+    }
+
+    .chat-input-row {
+      display: flex; gap: 8px; padding: 12px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .chat-input-row input {
+      flex: 1; padding: 9px 12px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 13px; font-family: inherit;
+      background: var(--bg); color: var(--text);
+    }
+    .chat-input-row input:focus {
+      outline: none; border-color: var(--blue);
+      box-shadow: 0 0 0 3px rgba(79,110,247,.12);
+    }
+    .chat-input-row input:disabled { opacity: .5; }
+
+    /* Quick reply chips */
+    .quick-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 0 16px 10px;
+    }
+    .chip {
+      padding: 5px 12px; border-radius: 20px;
+      border: 1.5px solid var(--blue); color: var(--blue);
+      background: var(--blue-light); font-size: 12px;
+      font-weight: 600; cursor: pointer; transition: all .12s;
+    }
+    .chip:hover { background: var(--blue); color: #fff; }
+
+    /* Plan preview box */
+    .plan-preview {
+      background: var(--bg); border: 1.5px solid var(--border);
+      border-radius: 10px; padding: 14px;
+      font-size: 12px; font-family: monospace;
+      max-height: 220px; overflow-y: auto;
+      white-space: pre-wrap; color: var(--text-2);
+      line-height: 1.6; margin-top: 14px;
+    }
+    .plan-preview::-webkit-scrollbar { width: 4px; }
+    .plan-preview::-webkit-scrollbar-thumb { background: var(--border); }
+
+    .preview-header {
+      display: flex; align-items: center;
+      justify-content: space-between; margin-bottom: 8px;
+    }
+    .preview-header h3 { font-size: 13px; font-weight: 700; color: var(--text); }
+
+    .bot-tag {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      border-radius: 20px;
+      background: linear-gradient(135deg,rgba(79,110,247,.15),rgba(139,92,246,.15));
+      color: var(--blue); border: 1px solid rgba(79,110,247,.25);
+    }
+  </style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📘</div>
+    <div>
+      <div class="logo-text">Study Planner</div>
+      <div class="logo-sub">Track your progress</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+    <a href="/" class="nav-item"><span class="ni">🏠</span> Dashboard</a>
+    <a href="/" class="nav-item"><span class="ni">📚</span> My Plans</a>
+    <a href="#" class="nav-item"><span class="ni">📅</span> Calendar</a>
+    <a href="#" class="nav-item"><span class="ni">📊</span> Statistics</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">Account</div>
+    <a href="/create" class="nav-item active"><span class="ni">➕</span> New Plan</a>
+    <a href="#" class="nav-item"><span class="ni">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="mot-title">🔥 Keep Going!</div>
+    <div class="mot-text">Small steps every day lead to big results.</div>
+    <div class="mot-bar-bg"><div class="mot-bar-fill" style="width:75%"></div></div>
+    <div class="mot-bar-label">75%</div>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="topheader">
+    <div class="topheader-left">
+      <div class="greeting">Create Study Plan</div>
+      <div class="greeting-sub">Paste your plan, build manually, or let the AI chatbot generate one for you</div>
+    </div>
+    <div class="topheader-right">
+      <div class="icon-btn" id="theme-toggle" onclick="toggleTheme()">🌙</div>
+      <div class="avatar">S</div>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <div class="breadcrumb">
+      <a href="/" class="back-btn">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 1 1 1.06 1.06L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06z"/></svg>
+        Back to Dashboard
+      </a>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb"><a href="/">Dashboard</a></span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb current">Create Plan</span>
+    </div>
+
+    <div style="max-width:680px;">
+      <div class="tabs">
+        <button class="tab" onclick="switchTab('bot',this)">🤖 AI Chatbot</button>
+        <button class="tab active" onclick="switchTab('paste',this)">📋 Paste &amp; Parse</button>
+        <button class="tab" onclick="switchTab('manual',this)">✏️ Manual</button>
+      </div>
+
+      <!-- ── AI Chatbot Tab ── -->
+      <div id="tab-bot" style="display:none;">
+        <div class="card" style="padding:0;overflow:hidden;">
+
+          <!-- Chat header -->
+          <div style="padding:16px 20px;border-bottom:1px solid var(--border);
+                      display:flex;align-items:center;justify-content:space-between;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:36px;height:36px;border-radius:10px;
+                          background:linear-gradient(135deg,#4F6EF7,#8b5cf6);
+                          display:flex;align-items:center;justify-content:center;font-size:18px;">🤖</div>
+              <div>
+                <div style="font-weight:700;font-size:14px;">Study Plan Assistant</div>
+                <div style="font-size:11px;color:var(--text-3);">Powered by rule-based AI</div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span class="bot-tag">✨ AI</span>
+              <button class="btn btn-ghost btn-sm" onclick="resetChat()">↺ Reset</button>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div class="chat-messages" id="chat-messages"></div>
+
+          <!-- Quick reply chips -->
+          <div class="quick-chips" id="quick-chips"></div>
+
+          <!-- Input row -->
+          <div class="chat-input-row">
+            <input type="text" id="chat-input"
+              placeholder="Type your answer and press Enter…"
+              onkeydown="if(event.key==='Enter') sendMessage()">
+            <button class="btn btn-primary btn-sm" onclick="sendMessage()">Send →</button>
+          </div>
+        </div>
+
+        <!-- Plan preview (shown after generation) -->
+        <div id="plan-preview-section" style="display:none;margin-top:16px;">
+          <div class="card">
+            <div class="preview-header">
+              <h3>📄 Generated Plan Preview</h3>
+              <button class="btn btn-ghost btn-sm" onclick="copyPlan()">📋 Copy</button>
+            </div>
+            <div class="plan-preview" id="plan-preview-text"></div>
+
+            <!-- Save form -->
+            <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+              <div id="bot-alert" class="alert" style="display:none;"></div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+                <div class="form-group" style="margin:0;">
+                  <label>Plan Title</label>
+                  <input type="text" id="bot-title" placeholder="e.g. Backend 30 Days Plan">
+                </div>
+                <div class="form-group" style="margin:0;">
+                  <label>Subject</label>
+                  <select id="bot-subject">
+                    <option>Backend</option><option>LeetCode</option>
+                    <option>Frontend</option><option>DevOps</option>
+                    <option>Python</option><option>Data Science</option><option>Other</option>
+                  </select>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Description <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
+                <input type="text" id="bot-desc" placeholder="e.g. 30 days roadmap to master backend">
+              </div>
+              <button class="btn btn-primary" style="width:100%;justify-content:center;"
+                onclick="saveGeneratedPlan()">
+                🚀 Use This Plan
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Paste Tab ── -->
+      <div id="tab-paste">
+        <div class="card">
+          <div class="card-header"><h2>Auto-Parse Plan Text</h2></div>
+          <div id="paste-alert" class="alert" style="display:none;"></div>
+          <form id="paste-form">
+            <div class="form-group">
+              <label>Plan Title</label>
+              <input type="text" id="p-title" placeholder="e.g. Backend 30 Days Plan" required>
+            </div>
+            <div class="form-group">
+              <label>Subject</label>
+              <select id="p-subject">
+                <option>Backend</option><option>LeetCode</option>
+                <option>Frontend</option><option>DevOps</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Description <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
+              <input type="text" id="p-desc" placeholder="e.g. 30 days roadmap to master backend development">
+            </div>
+            <div class="form-group">
+              <label>Paste Your Plan</label>
+              <textarea id="p-text" placeholder="Week 1 — Internet & HTTP&#10;Day 1 – How web works&#10;Day 2 – HTTP methods&#10;Week 2 — Backend Basics&#10;Day 3 – Node.js intro"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">⚙️ Parse &amp; Create</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- ── Manual Tab ── -->
+      <div id="tab-manual" style="display:none;">
+        <div class="card">
+          <div class="card-header"><h2>Create Empty Plan</h2></div>
+          <div id="manual-alert" class="alert" style="display:none;"></div>
+          <form id="manual-form">
+            <div class="form-group">
+              <label>Plan Title</label>
+              <input type="text" id="m-title" placeholder="e.g. Backend 30 Days Plan" required>
+            </div>
+            <div class="form-group">
+              <label>Subject</label>
+              <select id="m-subject">
+                <option>Backend</option><option>LeetCode</option>
+                <option>Frontend</option><option>DevOps</option><option>Other</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Description <span style="font-weight:400;color:var(--text-3);">(optional)</span></label>
+              <input type="text" id="m-desc" placeholder="e.g. 30 days roadmap to master backend development">
+            </div>
+            <button type="submit" class="btn btn-primary">Create Plan →</button>
+          </form>
+        </div>
+      </div>
+    </div><!-- /max-width -->
+
+  </div>
+</div>
+
+<script>
+/* ── Tab switching ── */
+function switchTab(name, btn) {
+  ['bot','paste','manual'].forEach(t => {
+    document.getElementById('tab-' + t).style.display = t === name ? '' : 'none';
+  });
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  btn.classList.add('active');
+  if (name === 'bot' && chatStep === 0) startChat();
+}
+
+/* ── Paste form ── */
+document.getElementById('paste-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const res = await fetch('/parse-plan', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title:       document.getElementById('p-title').value,
+      subject:     document.getElementById('p-subject').value,
+      description: document.getElementById('p-desc').value,
+      text:        document.getElementById('p-text').value
+    })
+  });
+  const data = await res.json();
+  const al = document.getElementById('paste-alert');
+  al.textContent = `✅ "${data.title}" created! Redirecting…`;
+  al.style.display = '';
+  setTimeout(() => location.href = `/plan/${data.id}/weeks`, 1200);
+});
+
+/* ── Manual form ── */
+document.getElementById('manual-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const res = await fetch('/plan', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title:       document.getElementById('m-title').value,
+      subject:     document.getElementById('m-subject').value,
+      description: document.getElementById('m-desc').value
+    })
+  });
+  const data = await res.json();
+  const al = document.getElementById('manual-alert');
+  al.textContent = `✅ "${data.title}" created! Redirecting…`;
+  al.style.display = '';
+  setTimeout(() => location.href = `/plan/${data.id}/weeks`, 1200);
+});
+
+/* ════════════════════════════════════════════════════════
+   CHATBOT ENGINE
+════════════════════════════════════════════════════════ */
+let chatStep    = 0;
+let chatContext = {};
+let generatedPlanText = '';
+
+const QUICK_REPLIES = {
+  1: ['Backend', 'Frontend', 'LeetCode', 'DevOps', 'Python', 'Data Science'],
+  2: ['7 days', '14 days', '21 days', '30 days', '60 days', '90 days'],
+  3: ['1 hour', '1.5 hours', '2 hours', '3 hours'],
+};
+
+function startChat() {
+  chatStep    = 0;
+  chatContext = {};
+  document.getElementById('chat-messages').innerHTML = '';
+  document.getElementById('quick-chips').innerHTML   = '';
+  document.getElementById('plan-preview-section').style.display = 'none';
+  sendToBot('', 0);   // trigger greeting
+}
+
+function resetChat() {
+  chatStep = 0;
+  startChat();
+}
+
+async function sendToBot(userMessage, step) {
+  const input = document.getElementById('chat-input');
+  input.disabled = true;
+
+  // Show user message (skip for step 0 greeting)
+  if (userMessage) appendMessage('user', userMessage);
+
+  // Show typing indicator
+  const typingId = showTyping();
+
+  try {
+    const res  = await fetch('/chatbot', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ step, message: userMessage, context: chatContext })
+    });
+    const data = await res.json();
+
+    removeTyping(typingId);
+    appendMessage('bot', data.reply);
+
+    chatStep    = data.next_step;
+    chatContext = data.context;
+
+    // Show quick reply chips for current step
+    renderChips(chatStep);
+
+    // If plan was generated
+    if (data.plan_text) {
+      generatedPlanText = data.plan_text;
+      showPlanPreview(data.plan_text, chatContext);
+    }
+
+  } catch (err) {
+    removeTyping(typingId);
+    appendMessage('bot', 'Sorry, something went wrong. Please try again.');
+  }
+
+  input.disabled = false;
+  if (chatStep < 4) input.focus();
+}
+
+function sendMessage() {
+  const input = document.getElementById('chat-input');
+  const text  = input.value.trim();
+  if (!text || chatStep === 4) return;
+  input.value = '';
+  document.getElementById('quick-chips').innerHTML = '';
+  sendToBot(text, chatStep);
+}
+
+function sendChip(text) {
+  document.getElementById('chat-input').value = text;
+  document.getElementById('quick-chips').innerHTML = '';
+  sendMessage();
+}
+
+function renderChips(step) {
+  const chips = QUICK_REPLIES[step] || [];
+  const el    = document.getElementById('quick-chips');
+  el.innerHTML = chips.map(c =>
+    `<button class="chip" onclick="sendChip('${c}')">${c}</button>`
+  ).join('');
+}
+
+function appendMessage(role, text) {
+  const el      = document.getElementById('chat-messages');
+  const div     = document.createElement('div');
+  div.className = `msg ${role}`;
+
+  // Bold **text** support
+  const formatted = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  div.innerHTML = `
+    <div class="msg-avatar">${role === 'bot' ? '🤖' : 'S'}</div>
+    <div class="msg-bubble">${formatted}</div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+}
+
+function showTyping() {
+  const el  = document.getElementById('chat-messages');
+  const div = document.createElement('div');
+  const id  = 'typing-' + Date.now();
+  div.id    = id;
+  div.className = 'msg bot';
+  div.innerHTML = `
+    <div class="msg-avatar">🤖</div>
+    <div class="msg-bubble" style="padding:8px 14px;">
+      <div class="typing-indicator">
+        <span></span><span></span><span></span>
+      </div>
+    </div>`;
+  el.appendChild(div);
+  el.scrollTop = el.scrollHeight;
+  return id;
+}
+
+function removeTyping(id) {
+  const el = document.getElementById(id);
+  if (el) el.remove();
+}
+
+function showPlanPreview(planText, ctx) {
+  const section = document.getElementById('plan-preview-section');
+  document.getElementById('plan-preview-text').textContent = planText;
+
+  // Pre-fill the save form
+  const subj  = ctx.subject || 'Backend';
+  const days  = ctx.days    || 30;
+  document.getElementById('bot-title').value = `${subj} ${days}-Day Plan`;
+  // Set subject dropdown
+  const sel = document.getElementById('bot-subject');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value.toLowerCase() === subj.toLowerCase()) {
+      sel.selectedIndex = i; break;
+    }
+  }
+  document.getElementById('bot-desc').value =
+    `${days}-day roadmap to master ${subj.toLowerCase()}`;
+
+  section.style.display = 'block';
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function copyPlan() {
+  navigator.clipboard.writeText(generatedPlanText)
+    .then(() => alert('Plan copied to clipboard!'))
+    .catch(() => {});
+}
+
+async function saveGeneratedPlan() {
+  const title = document.getElementById('bot-title').value.trim();
+  if (!title) {
+    document.getElementById('bot-title').focus(); return;
+  }
+  const btn = document.querySelector('#plan-preview-section .btn-primary');
+  btn.textContent = 'Saving…';
+  btn.disabled    = true;
+
+  const res = await fetch('/parse-plan', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      title,
+      subject:     document.getElementById('bot-subject').value,
+      description: document.getElementById('bot-desc').value,
+      text:        generatedPlanText
+    })
+  });
+  const data = await res.json();
+  const al = document.getElementById('bot-alert');
+  al.textContent   = `✅ "${data.title}" created! Redirecting…`;
+  al.style.display = '';
+  setTimeout(() => location.href = `/plan/${data.id}/weeks`, 1200);
+}
+
+/* ── Auto-start chatbot when page loads on bot tab ── */
+window.addEventListener('load', () => {
+  // Default tab is paste — chatbot starts when user clicks its tab
+});
+</script>
+</body>
+</html>

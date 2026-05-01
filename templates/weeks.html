@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ plan.title }} — Weeks</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📘</div>
+    <div>
+      <div class="logo-text">Study Planner</div>
+      <div class="logo-sub">Track your progress</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+    <a href="/" class="nav-item"><span class="ni">🏠</span> Dashboard</a>
+    <a href="/" class="nav-item"><span class="ni">📚</span> My Plans</a>
+    <a href="#" class="nav-item"><span class="ni">📅</span> Calendar</a>
+    <a href="#" class="nav-item"><span class="ni">📊</span> Statistics</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">This Plan</div>
+    <a href="/plan/{{ plan.id }}/weeks" class="nav-item active"><span class="ni">📅</span> Weeks</a>
+    <a href="/plan/{{ plan.id }}/calendar" class="nav-item"><span class="ni">🗓️</span> Calendar</a>
+    <a href="/plan/{{ plan.id }}/dashboard" class="nav-item"><span class="ni">📊</span> Progress</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">Account</div>
+    <a href="/create" class="nav-item"><span class="ni">➕</span> New Plan</a>
+    <a href="#" class="nav-item"><span class="ni">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="mot-title">🔥 Keep Going!</div>
+    <div class="mot-text">Small steps every day lead to big results.</div>
+    <div class="mot-bar-bg">
+      <div class="mot-bar-fill" id="mot-fill" style="width:0%"></div>
+    </div>
+    <div class="mot-bar-label" id="mot-label">0%</div>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="topheader">
+    <div class="topheader-left">
+      <div class="greeting">{{ plan.title }}</div>
+      <div class="greeting-sub"><span class="subject-tag">{{ plan.subject }}</span>&nbsp; {{ weeks|length }} week(s)</div>
+    </div>
+    <div class="topheader-right">
+      <div class="icon-btn" id="theme-toggle" onclick="toggleTheme()">🌙</div>
+      <div class="avatar">S</div>
+      <a href="/plan/{{ plan.id }}/dashboard" class="btn btn-outline btn-sm">📊 Progress</a>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <div class="breadcrumb">
+      <a href="/" class="back-btn">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 1 1 1.06 1.06L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06z"/></svg>
+        Back to Dashboard
+      </a>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb"><a href="/">Dashboard</a></span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb current">{{ plan.title }}</span>
+    </div>
+
+    {% if weeks %}
+      {% for week in weeks %}
+      <div class="row-item">
+        <div class="row-num">W{{ week.week_number }}</div>
+        <div class="row-info">
+          <div class="row-title">{{ week.title }}</div>
+          <div class="row-meta" id="meta-w{{ week.id }}">Loading…</div>
+        </div>
+        <a href="/week/{{ week.id }}/days" class="btn btn-primary btn-sm">Track Days →</a>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="card" style="text-align:center;padding:36px;">
+        <div style="font-size:36px;margin-bottom:10px;">📭</div>
+        <p class="empty">No weeks yet. Add one below.</p>
+      </div>
+    {% endif %}
+
+    <div class="card" style="margin-top:20px;">
+      <div class="card-header"><h2>Add Week</h2></div>
+      <div class="add-row">
+        <input type="text" id="week-title" placeholder="e.g. Week 1 — Internet & HTTP">
+        <button class="btn btn-success" onclick="addWeek()">+ Add Week</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const planId = '{{ plan.id }}';
+async function loadMeta() {
+  const res  = await fetch(`/progress/${planId}`);
+  const data = await res.json();
+  document.getElementById('mot-fill').style.width = data.percent + '%';
+  document.getElementById('mot-label').textContent = data.percent + '%';
+  data.weeks.forEach(w => {
+    const el = document.getElementById(`meta-w${w.week_id}`);
+    if (el) el.textContent = `${w.completed} / ${w.total} days completed · ${w.percent}%`;
+  });
+}
+async function addWeek() {
+  const title = document.getElementById('week-title').value.trim();
+  if (!title) return;
+  await fetch('/week', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({title, plan_id: planId})
+  });
+  location.reload();
+}
+loadMeta();
+</script>
+</body>
+</html>

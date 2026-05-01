@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ plan.title }} — Study Calendar</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body style="display:block;background:var(--bg);">
+
+<!-- ══════════════════════════════════════════════════════
+     TOP NAVBAR
+══════════════════════════════════════════════════════ -->
+<nav class="cal-navbar">
+  <div style="display:flex;align-items:center;gap:20px;">
+    <a href="/" style="text-decoration:none;">
+      <div class="cal-navbar-brand">StudyFlow</div>
+    </a>
+    <div style="display:flex;align-items:center;gap:6px;font-size:13px;color:var(--text-3);">
+      <a href="/" style="color:var(--text-3);text-decoration:none;">Home</a>
+      <span>/</span>
+      <a href="/plan/{{ plan.id }}/weeks" style="color:var(--text-3);text-decoration:none;">{{ plan.title[:20] }}</a>
+      <span>/</span>
+      <span style="color:var(--text);font-weight:600;">Calendar</span>
+    </div>
+  </div>
+  <div class="cal-navbar-right">
+    <div class="cal-search">
+      <span>🔍</span>
+      <input type="text" placeholder="Search sessions…">
+    </div>
+    <div class="notif-btn">
+      🔔
+      <div class="notif-dot"></div>
+    </div>
+    <div class="avatar">S</div>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════
+     MAIN LAYOUT
+══════════════════════════════════════════════════════ -->
+<div class="cal-layout">
+
+  <!-- ── LEFT: Calendar Main ── -->
+  <div class="cal-main">
+
+    <!-- Calendar Header -->
+    <div class="cal-page-header">
+      <div>
+        <h1>📅 Study Calendar</h1>
+        <p id="cal-subtitle">Visualize your learning momentum</p>
+      </div>
+      <div class="cal-controls">
+        <div class="cal-month-nav">
+          <button onclick="changeCalMonth(-1)">‹</button>
+          <span id="cal-month-label">Loading…</span>
+          <button onclick="changeCalMonth(1)">›</button>
+        </div>
+        <div class="view-toggle">
+          <button class="view-btn active" onclick="setView('month',this)">Month</button>
+          <button class="view-btn" onclick="setView('week',this)">Week</button>
+          <button class="view-btn" onclick="setView('list',this)">List</button>
+        </div>
+        <button class="new-session-btn" onclick="location.href='/week/{{ plan.id }}/days'">
+          ＋ New Session
+        </button>
+      </div>
+    </div>
+
+    <!-- Month View -->
+    <div id="view-month">
+      <div class="cal-grid-wrap">
+        <!-- Day-of-week header -->
+        <div class="cal-dow-row">
+          <div class="cal-dow-cell weekend">SUN</div>
+          <div class="cal-dow-cell">MON</div>
+          <div class="cal-dow-cell">TUE</div>
+          <div class="cal-dow-cell">WED</div>
+          <div class="cal-dow-cell">THU</div>
+          <div class="cal-dow-cell">FRI</div>
+          <div class="cal-dow-cell weekend">SAT</div>
+        </div>
+        <!-- Calendar body injected by JS -->
+        <div class="cal-body" id="cal-body"></div>
+      </div>
+    </div>
+
+    <!-- Week View -->
+    <div id="view-week" style="display:none;">
+      <div class="card">
+        <div class="card-header"><h2 id="week-view-title">This Week</h2></div>
+        <div id="week-view-body"></div>
+      </div>
+    </div>
+
+    <!-- List View -->
+    <div id="view-list" style="display:none;">
+      <div class="card">
+        <div class="card-header"><h2>All Study Sessions</h2></div>
+        <div id="list-view-body"></div>
+      </div>
+    </div>
+
+    <!-- Legend (below calendar) -->
+    <div style="display:flex;align-items:center;gap:16px;margin-top:14px;flex-wrap:wrap;">
+      <span style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.06em;">Legend:</span>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2);">
+        <div style="width:10px;height:10px;border-radius:3px;background:#dbeafe;"></div> Scheduled
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2);">
+        <div style="width:10px;height:10px;border-radius:3px;background:var(--green-light);"></div> Completed
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2);">
+        <div style="width:10px;height:10px;border-radius:3px;background:#fef3c7;"></div> Overdue
+      </div>
+      <div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text-2);">
+        <div style="width:10px;height:10px;border-radius:3px;background:var(--red-light);"></div> Deadline
+      </div>
+    </div>
+
+  </div><!-- /cal-main -->
+
+  <!-- ── RIGHT: Sidebar ── -->
+  <div class="cal-sidebar">
+
+    <!-- Section A: Monthly Focus -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">
+        📊 Monthly Focus
+        <a href="/plan/{{ plan.id }}/dashboard">View All →</a>
+      </div>
+      <div id="focus-cards">
+        <div style="color:var(--text-3);font-size:13px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Section B: Upcoming / Overdue -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">
+        ⚠️ Urgent Deadlines
+      </div>
+      <div id="deadline-list">
+        <div style="color:var(--text-3);font-size:13px;">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Section C: Quick Stats -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">📈 This Month</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;" id="month-stats">
+        <div class="focus-card" style="text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--blue);" id="ms-done">—</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Completed</div>
+        </div>
+        <div class="focus-card" style="text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--orange);" id="ms-overdue">—</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Overdue</div>
+        </div>
+        <div class="focus-card" style="text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--green);" id="ms-streak">—</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Streak 🔥</div>
+        </div>
+        <div class="focus-card" style="text-align:center;">
+          <div style="font-size:22px;font-weight:800;color:var(--purple);" id="ms-total">—</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">Total Days</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section D: Legend -->
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">🎨 Color Guide</div>
+      <div class="legend-grid">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#dbeafe;border:1px solid #93c5fd;"></div>
+          Primary Track
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--green-light);"></div>
+          Completed
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--purple-light);"></div>
+          Lab / Group
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--red-light);"></div>
+          Deadline
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:#fef3c7;"></div>
+          Overdue
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--bg);border:1px solid var(--border);"></div>
+          Upcoming
+        </div>
+      </div>
+    </div>
+
+    <!-- Back links -->
+    <div style="display:flex;flex-direction:column;gap:6px;margin-top:8px;">
+      <a href="/plan/{{ plan.id }}/weeks" class="btn btn-outline btn-sm" style="justify-content:center;">
+        📅 View Weeks
+      </a>
+      <a href="/plan/{{ plan.id }}/dashboard" class="btn btn-ghost btn-sm" style="justify-content:center;">
+        📊 Analytics
+      </a>
+    </div>
+
+  </div><!-- /cal-sidebar -->
+</div><!-- /cal-layout -->
+
+<!-- ══════════════════════════════════════════════════════
+     MOBILE BOTTOM NAV
+══════════════════════════════════════════════════════ -->
+<nav class="mobile-bottom-nav">
+  <div class="mobile-nav-items">
+    <a href="/" class="mobile-nav-item">
+      <span class="mn-icon">🏠</span> Home
+    </a>
+    <a href="/plan/{{ plan.id }}/calendar" class="mobile-nav-item active">
+      <span class="mn-icon">📅</span> Calendar
+    </a>
+    <a href="/plan/{{ plan.id }}/weeks" class="mobile-nav-item">
+      <span class="mn-icon">📚</span> Weeks
+    </a>
+    <a href="/plan/{{ plan.id }}/dashboard" class="mobile-nav-item">
+      <span class="mn-icon">📊</span> Stats
+    </a>
+  </div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════
+     JAVASCRIPT
+══════════════════════════════════════════════════════ -->
+<script>
+const PLAN_ID = '{{ plan.id }}';
+const MONTHS  = ['January','February','March','April','May','June',
+                 'July','August','September','October','November','December'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun',
+                      'Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const today     = new Date();
+let   calYear   = today.getFullYear();
+let   calMonth  = today.getMonth();
+let   allDays   = [];   // flat array from /progress
+let   analytics = {};
+
+/* ── Fetch all data ──────────────────────────────────── */
+async function init() {
+  try {
+    const [progRes, analRes] = await Promise.all([
+      fetch(`/progress/${PLAN_ID}`),
+      fetch(`/analytics/${PLAN_ID}`)
+    ]);
+    const prog = await progRes.json();
+    analytics  = analRes.ok ? await analRes.json() : {};
+
+    // Flatten all days
+    allDays = [];
+    prog.weeks.forEach(w => w.days.forEach(d => allDays.push(d)));
+
+    renderCalendar();
+    renderSidebar(prog);
+    updateSubtitle();
+  } catch(e) {
+    console.error(e);
+  }
+}
+
+/* ── Build day → sessions map ────────────────────────── */
+function buildDayMap() {
+  const map = {};
+  allDays.forEach(d => {
+    if (!d.date) return;
+    if (!map[d.date]) map[d.date] = [];
+    map[d.date].push(d);
+  });
+  return map;
+}
+
+/* ── Render Month Calendar ───────────────────────────── */
+function renderCalendar() {
+  const dayMap  = buildDayMap();
+  const firstDOW = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+  const todayISO    = today.toISOString().slice(0,10);
+
+  document.getElementById('cal-month-label').textContent =
+    `${MONTHS[calMonth]} ${calYear}`;
+
+  let html = '';
+  let cellCount = 0;
+
+  // Previous month padding
+  for (let i = firstDOW - 1; i >= 0; i--) {
+    const d   = daysInPrev - i;
+    const iso = isoDate(calYear, calMonth - 1, d);
+    html += buildCell(d, iso, dayMap[iso] || [], true, false);
+    cellCount++;
+  }
+
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso     = isoDate(calYear, calMonth, d);
+    const isToday = iso === todayISO;
+    html += buildCell(d, iso, dayMap[iso] || [], false, isToday);
+    cellCount++;
+  }
+
+  // Next month padding
+  const remaining = (7 - (cellCount % 7)) % 7;
+  for (let d = 1; d <= remaining; d++) {
+    const iso = isoDate(calYear, calMonth + 1, d);
+    html += buildCell(d, iso, dayMap[iso] || [], true, false);
+  }
+
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function buildCell(dayNum, iso, sessions, otherMonth, isToday) {
+  const todayISO = today.toISOString().slice(0,10);
+  let cls = 'cal-cell';
+  if (otherMonth) cls += ' other-month';
+  if (isToday)    cls += ' is-today';
+
+  // Check icon if all sessions completed
+  const allDone = sessions.length > 0 && sessions.every(s => s.status === 'completed');
+  const checkIcon = allDone
+    ? `<div class="check-icon">✓</div>` : '';
+
+  const todayBadge = isToday ? `<span class="today-badge">TODAY</span>` : '';
+
+  // Build tag pills (max 3)
+  const tags = sessions.slice(0, 3).map(s => {
+    const label = s.title.replace(/Day\s+\d+\s*[–-]?\s*/i, '').slice(0, 22);
+    let tagCls = 'tag-future';
+    if (s.status === 'completed') tagCls = 'tag-completed';
+    else if (s.date && s.date < todayISO) tagCls = 'tag-overdue';
+    else tagCls = 'tag-primary';
+    return `<span class="session-tag ${tagCls}" title="${s.title}">${label}</span>`;
+  }).join('');
+
+  const moreTags = sessions.length > 3
+    ? `<span class="more-tag">+${sessions.length - 3} more</span>` : '';
+
+  return `
+    <div class="${cls}" onclick="onCellClick('${iso}')">
+      <div class="cal-cell-num">
+        ${dayNum}${todayBadge}${checkIcon}
+      </div>
+      <div class="session-tags">${tags}${moreTags}</div>
+    </div>`;
+}
+
+function isoDate(year, month, day) {
+  const d = new Date(year, month, day);
+  return d.toISOString().slice(0,10);
+}
+
+function onCellClick(iso) {
+  const sessions = allDays.filter(d => d.date === iso);
+  if (!sessions.length) return;
+  const names = sessions.map(s => `• ${s.title} (${s.status})`).join('\n');
+  alert(`Sessions on ${iso}:\n\n${names}`);
+}
+
+/* ── Week View ───────────────────────────────────────── */
+function renderWeekView() {
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+  const dayMap = buildDayMap();
+  let html = '';
+  for (let i = 0; i < 7; i++) {
+    const d   = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    const iso = d.toISOString().slice(0,10);
+    const sessions = dayMap[iso] || [];
+    const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+    const isToday = iso === today.toISOString().slice(0,10);
+    html += `
+      <div style="display:flex;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);align-items:flex-start;">
+        <div style="min-width:52px;text-align:center;">
+          <div style="font-size:11px;font-weight:700;color:var(--text-3);text-transform:uppercase;">${dow}</div>
+          <div style="font-size:20px;font-weight:800;color:${isToday ? 'var(--blue)' : 'var(--text)'};">${d.getDate()}</div>
+        </div>
+        <div style="flex:1;">
+          ${sessions.length ? sessions.map(s => {
+            let tagCls = s.status === 'completed' ? 'tag-completed' : (s.date < today.toISOString().slice(0,10) ? 'tag-overdue' : 'tag-primary');
+            return `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg);border-radius:8px;margin-bottom:4px;">
+              <span class="session-tag ${tagCls}" style="font-size:10px;">${s.status === 'completed' ? '✓' : '○'}</span>
+              <span style="font-size:13px;font-weight:500;">${s.title}</span>
+            </div>`;
+          }).join('') : `<div style="font-size:12px;color:var(--text-3);padding:6px 0;">No sessions</div>`}
+        </div>
+      </div>`;
+  }
+  document.getElementById('week-view-title').textContent =
+    `Week of ${startOfWeek.toLocaleDateString('en-US',{month:'short',day:'numeric'})}`;
+  document.getElementById('week-view-body').innerHTML = html;
+}
+
+/* ── List View ───────────────────────────────────────── */
+function renderListView() {
+  const sorted = [...allDays].filter(d => d.date).sort((a,b) => a.date.localeCompare(b.date));
+  const todayISO = today.toISOString().slice(0,10);
+  let html = '';
+  let lastMonth = '';
+  sorted.forEach(d => {
+    const month = d.date.slice(0,7);
+    if (month !== lastMonth) {
+      const [y,m] = month.split('-');
+      html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);padding:12px 0 6px;">${MONTHS[parseInt(m)-1]} ${y}</div>`;
+      lastMonth = month;
+    }
+    let tagCls = 'tag-future';
+    if (d.status === 'completed') tagCls = 'tag-completed';
+    else if (d.date < todayISO)   tagCls = 'tag-overdue';
+    else                          tagCls = 'tag-primary';
+
+    const dateObj = new Date(d.date + 'T00:00:00');
+    const dateStr = dateObj.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+    html += `
+      <div style="display:flex;align-items:center;gap:12px;padding:9px 12px;background:var(--bg);border-radius:8px;margin-bottom:4px;border:1px solid var(--border);">
+        <span style="font-size:12px;color:var(--text-3);min-width:100px;">${dateStr}</span>
+        <span class="session-tag ${tagCls}" style="flex-shrink:0;">Day ${d.day_number}</span>
+        <span style="font-size:13px;font-weight:500;flex:1;">${d.title}</span>
+        <span class="badge ${d.status === 'pending' ? 'pending' : ''}">${d.status}</span>
+      </div>`;
+  });
+  document.getElementById('list-view-body').innerHTML = html || '<p class="empty">No sessions found.</p>';
+}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+function renderSidebar(prog) {
+  // Monthly Focus — per week progress
+  const focusHtml = prog.weeks.map(w => `
+    <div class="focus-card">
+      <div class="focus-card-top">
+        <div class="focus-card-title">${w.title}</div>
+        <div class="focus-card-pct">${w.percent}%</div>
+      </div>
+      <div class="focus-bar-bg">
+        <div class="focus-bar-fill" style="width:${w.percent}%"></div>
+      </div>
+    </div>`).join('');
+  document.getElementById('focus-cards').innerHTML = focusHtml ||
+    '<p class="empty">No weeks yet.</p>';
+
+  // Deadlines — overdue + next 7 days
+  const todayISO = today.toISOString().slice(0,10);
+  const upcoming = allDays
+    .filter(d => d.status === 'pending' && d.date)
+    .sort((a,b) => a.date.localeCompare(b.date))
+    .slice(0, 5);
+
+  if (!upcoming.length) {
+    document.getElementById('deadline-list').innerHTML =
+      '<p class="empty" style="font-size:12px;">No upcoming deadlines 🎉</p>';
+  } else {
+    document.getElementById('deadline-list').innerHTML = upcoming.map((d, i) => {
+      const dt      = new Date(d.date + 'T00:00:00');
+      const diffMs  = dt - today;
+      const diffDay = Math.ceil(diffMs / 86400000);
+      const urgent  = d.date < todayISO || diffDay <= 2;
+      const dueText = d.date < todayISO
+        ? `${Math.abs(diffDay)} day(s) overdue`
+        : diffDay === 0 ? 'Due today'
+        : `Due in ${diffDay} day(s)`;
+      return `
+        <div class="deadline-item">
+          <div class="deadline-date-box ${urgent ? 'urgent' : ''}">
+            <div class="dd-month">${MONTHS_SHORT[dt.getMonth()]}</div>
+            <div class="dd-day">${dt.getDate()}</div>
+          </div>
+          <div class="deadline-body">
+            <div class="deadline-title">${d.title.replace(/Day\s+\d+\s*[–-]?\s*/i,'').slice(0,30)}</div>
+            <div class="deadline-meta ${urgent ? 'urgent' : ''}">${dueText} · Day ${d.day_number}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // Quick stats
+  const curMonth = today.getMonth();
+  const curYear  = today.getFullYear();
+  const monthDays = allDays.filter(d => {
+    if (!d.date) return false;
+    const dt = new Date(d.date);
+    return dt.getMonth() === curMonth && dt.getFullYear() === curYear;
+  });
+  const mDone    = monthDays.filter(d => d.status === 'completed').length;
+  const mOverdue = monthDays.filter(d => d.status === 'pending' && d.date < todayISO).length;
+
+  document.getElementById('ms-done').textContent    = mDone;
+  document.getElementById('ms-overdue').textContent = mOverdue;
+  document.getElementById('ms-total').textContent   = allDays.length;
+  document.getElementById('ms-streak').textContent  =
+    analytics.streaks ? analytics.streaks.current : '—';
+}
+
+function updateSubtitle() {
+  document.getElementById('cal-subtitle').textContent =
+    `Visualize your learning momentum for ${MONTHS[calMonth]} ${calYear}`;
+}
+
+/* ── View switching ──────────────────────────────────── */
+function setView(name, btn) {
+  ['month','week','list'].forEach(v => {
+    document.getElementById(`view-${v}`).style.display = v === name ? '' : 'none';
+  });
+  document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  if (name === 'week') renderWeekView();
+  if (name === 'list') renderListView();
+}
+
+function changeCalMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  renderCalendar();
+  updateSubtitle();
+}
+
+/* ── Init ────────────────────────────────────────────── */
+init();
+</script>
+</body>
+</html>

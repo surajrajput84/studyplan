@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ plan.title }} — Progress</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📘</div>
+    <div>
+      <div class="logo-text">Study Planner</div>
+      <div class="logo-sub">Track your progress</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+    <a href="/" class="nav-item"><span class="ni">🏠</span> Dashboard</a>
+    <a href="/" class="nav-item"><span class="ni">📚</span> My Plans</a>
+    <a href="#" class="nav-item"><span class="ni">📅</span> Calendar</a>
+    <a href="#" class="nav-item"><span class="ni">📊</span> Statistics</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">This Plan</div>
+    <a href="/plan/{{ plan.id }}/weeks" class="nav-item"><span class="ni">📅</span> Weeks</a>
+    <a href="/plan/{{ plan.id }}/calendar" class="nav-item"><span class="ni">🗓️</span> Calendar</a>
+    <a href="/plan/{{ plan.id }}/dashboard" class="nav-item active"><span class="ni">📊</span> Progress</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">Account</div>
+    <a href="/create" class="nav-item"><span class="ni">➕</span> New Plan</a>
+    <a href="#" class="nav-item"><span class="ni">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="mot-title">🔥 Keep Going!</div>
+    <div class="mot-text">Small steps every day lead to big results.</div>
+    <div class="mot-bar-bg">
+      <div class="mot-bar-fill" id="mot-fill" style="width:0%"></div>
+    </div>
+    <div class="mot-bar-label" id="mot-label">0%</div>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="topheader">
+    <div class="topheader-left">
+      <div class="greeting">Progress Dashboard</div>
+      <div class="greeting-sub">{{ plan.title }} &nbsp;·&nbsp; <span class="subject-tag">{{ plan.subject }}</span></div>
+    </div>
+    <div class="topheader-right">
+      <div class="icon-btn" id="theme-toggle" onclick="toggleTheme()">🌙</div>
+      <div class="avatar">S</div>
+      <a href="/plan/{{ plan.id }}/weeks" class="btn btn-outline btn-sm">← Weeks</a>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <div class="breadcrumb">
+      <a href="/plan/{{ plan.id }}/weeks" class="back-btn">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 1 1 1.06 1.06L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06z"/></svg>
+        Back to Weeks
+      </a>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb"><a href="/">Dashboard</a></span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb"><a href="/plan/{{ plan.id }}/weeks">{{ plan.title }}</a></span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb current">Progress</span>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-box"><div class="val" id="s-total">—</div><div class="lbl">Total Days</div></div>
+      <div class="stat-box"><div class="val" id="s-done">—</div><div class="lbl">Completed</div></div>
+      <div class="stat-box"><div class="val" id="s-remaining">—</div><div class="lbl">Remaining</div></div>
+      <div class="stat-box"><div class="val" id="s-pct">—</div><div class="lbl">Progress</div></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Overall Progress</h2></div>
+      <div class="progress-wrap">
+        <div class="progress-bg">
+          <div class="progress-fill" id="overall-bar" style="width:0%"></div>
+        </div>
+        <div class="progress-label" id="overall-label"></div>
+      </div>
+    </div>
+
+    <div id="weeks-progress"></div>
+
+  </div>
+</div>
+
+<script>
+const planId = '{{ plan.id }}';
+
+async function load() {
+  const res  = await fetch(`/progress/${planId}`);
+  const data = await res.json();
+
+  document.getElementById('s-total').textContent     = data.total;
+  document.getElementById('s-done').textContent      = data.completed;
+  document.getElementById('s-remaining').textContent = data.total - data.completed;
+  document.getElementById('s-pct').textContent       = data.percent + '%';
+  document.getElementById('overall-bar').style.width = data.percent + '%';
+  document.getElementById('overall-label').textContent =
+    `${data.completed} of ${data.total} days completed (${data.percent}%)`;
+  document.getElementById('mot-fill').style.width  = data.percent + '%';
+  document.getElementById('mot-label').textContent = data.percent + '%';
+
+  const container = document.getElementById('weeks-progress');
+  data.weeks.forEach(week => {
+    const daysHtml = week.days.map(d => `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+                  padding:9px 0;border-bottom:1px solid var(--border);font-size:13px;">
+        <span style="color:var(--text);">${d.title}</span>
+        <span class="badge ${d.status === 'pending' ? 'pending' : ''}">${d.status}</span>
+      </div>`).join('');
+
+    container.innerHTML += `
+      <div class="card">
+        <div class="card-header">
+          <h2>${week.title}</h2>
+          <span style="font-size:13px;color:var(--text-3);font-weight:600;">
+            ${week.completed} / ${week.total} days · ${week.percent}%
+          </span>
+        </div>
+        <div class="progress-wrap">
+          <div class="progress-bg">
+            <div class="progress-fill" style="width:${week.percent}%"></div>
+          </div>
+        </div>
+        <div style="margin-top:10px;">${daysHtml}</div>
+      </div>`;
+  });
+}
+
+load();
+</script>
+</body>
+</html>

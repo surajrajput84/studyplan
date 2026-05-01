@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>All Plans Calendar — Study Planner</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body style="display:block;background:var(--bg);">
+
+<nav class="cal-navbar">
+  <div style="display:flex;align-items:center;gap:20px;">
+    <a href="/" style="text-decoration:none;">
+      <div class="cal-navbar-brand">StudyFlow</div>
+    </a>
+  </div>
+  <div class="cal-navbar-right">
+    <div class="avatar">{{ username[0].upper() }}</div>
+  </div>
+</nav>
+
+<div class="cal-layout">
+  <div class="cal-main">
+    <div class="cal-page-header">
+      <div>
+        <h1>📅 All Plans Calendar</h1>
+        <p id="cal-subtitle">All your study sessions in one view</p>
+      </div>
+      <div class="cal-controls">
+        <div class="cal-month-nav">
+          <button onclick="changeCalMonth(-1)">‹</button>
+          <span id="cal-month-label">Loading…</span>
+          <button onclick="changeCalMonth(1)">›</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="cal-grid-wrap">
+      <div class="cal-dow-row">
+        <div class="cal-dow-cell weekend">SUN</div>
+        <div class="cal-dow-cell">MON</div>
+        <div class="cal-dow-cell">TUE</div>
+        <div class="cal-dow-cell">WED</div>
+        <div class="cal-dow-cell">THU</div>
+        <div class="cal-dow-cell">FRI</div>
+        <div class="cal-dow-cell weekend">SAT</div>
+      </div>
+      <div class="cal-body" id="cal-body"></div>
+    </div>
+  </div>
+
+  <div class="cal-sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-section-title">📊 Your Plans</div>
+      <div id="plans-list"></div>
+    </div>
+    <a href="/" class="btn btn-outline btn-sm" style="justify-content:center;width:100%;">← Back to Dashboard</a>
+  </div>
+</div>
+
+<script>
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const today = new Date();
+let calYear = today.getFullYear();
+let calMonth = today.getMonth();
+let allDays = [];
+let planColors = {};
+const PLAN_COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4', '#ec4899', '#84cc16'];
+
+async function init() {
+  const res = await fetch('/dashboard-data');
+  const data = await res.json();
+  
+  // Assign colors to each plan
+  data.plans.forEach((p, i) => {
+    planColors[p.id] = PLAN_COLORS[i % PLAN_COLORS.length];
+  });
+  
+  // Flatten all days from all plans
+  allDays = [];
+  data.plans.forEach(p => {
+    p.weeks.forEach(w => {
+      w.days.forEach(d => {
+        allDays.push({...d, plan_title: p.title, plan_id: p.id, plan_color: planColors[p.id]});
+      });
+    });
+  });
+  
+  renderCalendar();
+  renderSidebar(data.plans);
+}
+
+function buildDayMap() {
+  const map = {};
+  allDays.forEach(d => {
+    if (!d.date) return;
+    if (!map[d.date]) map[d.date] = [];
+    map[d.date].push(d);
+  });
+  return map;
+}
+
+function renderCalendar() {
+  const dayMap = buildDayMap();
+  const firstDOW = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const todayISO = today.toISOString().slice(0,10);
+
+  document.getElementById('cal-month-label').textContent = `${MONTHS[calMonth]} ${calYear}`;
+
+  let html = '';
+  
+  // Padding
+  for (let i = 0; i < firstDOW; i++) {
+    html += `<div class="cal-cell other-month"></div>`;
+  }
+
+  // Days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = iso === todayISO;
+    const sessions = dayMap[iso] || [];
+    
+    let cls = 'cal-cell';
+    if (isToday) cls += ' is-today';
+    
+    const allDone = sessions.length > 0 && sessions.every(s => s.status === 'completed');
+    const checkIcon = allDone ? `<div class="check-icon">✓</div>` : '';
+    const todayBadge = isToday ? `<span class="today-badge">TODAY</span>` : '';
+    
+    const tags = sessions.slice(0, 3).map(s => {
+      const topic = s.title.replace(/Day\s+\d+\s*[–\-]?\s*/i, '').slice(0, 22);
+      const bgColor = s.status === 'completed' ? '#10b98180' : s.plan_color + '40';
+      const borderColor = s.plan_color;
+      return `<span class="session-tag" style="background:${bgColor};border:1px solid ${borderColor};color:#1a202c;font-weight:500;" title="${s.plan_title}: ${s.title}">${topic}</span>`;
+    }).join('');
+    
+    const moreTags = sessions.length > 3 ? `<span class="more-tag">+${sessions.length - 3}</span>` : '';
+    
+    html += `
+      <div class="${cls}">
+        <div class="cal-cell-num">${d}${todayBadge}${checkIcon}</div>
+        <div class="session-tags">${tags}${moreTags}</div>
+      </div>`;
+  }
+  
+  document.getElementById('cal-body').innerHTML = html;
+}
+
+function renderSidebar(plans) {
+  const html = plans.map(p => {
+    const color = planColors[p.id];
+    return `
+    <div class="focus-card" style="cursor:pointer;border-left:4px solid ${color};" onclick="location.href='/plan/${p.id}/calendar'">
+      <div class="focus-card-top">
+        <div class="focus-card-title">${p.title}</div>
+        <div class="focus-card-pct" style="color:${color}">${p.percent}%</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-3);margin:4px 0 8px 0;">${p.completed}/${p.total} days completed</div>
+      <div class="focus-bar-bg">
+        <div class="focus-bar-fill" style="width:${p.percent}%;background:${color}"></div>
+      </div>
+    </div>
+  `}).join('');
+  document.getElementById('plans-list').innerHTML = html || '<p class="empty">No plans yet</p>';
+}
+
+function changeCalMonth(dir) {
+  calMonth += dir;
+  if (calMonth > 11) { calMonth = 0; calYear++; }
+  if (calMonth < 0) { calMonth = 11; calYear--; }
+  renderCalendar();
+}
+
+init();
+</script>
+</body>
+</html>

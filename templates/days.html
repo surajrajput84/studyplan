@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ week.title }} — Days</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">📘</div>
+    <div>
+      <div class="logo-text">Study Planner</div>
+      <div class="logo-sub">Track your progress</div>
+    </div>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section-label">Main Menu</div>
+    <a href="/" class="nav-item"><span class="ni">🏠</span> Dashboard</a>
+    <a href="/" class="nav-item"><span class="ni">📚</span> My Plans</a>
+    <a href="#" class="nav-item"><span class="ni">📅</span> Calendar</a>
+    <a href="#" class="nav-item"><span class="ni">📊</span> Statistics</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">This Plan</div>
+    <a href="/plan/{{ week.plan_id }}/weeks" class="nav-item"><span class="ni">📅</span> Weeks</a>
+    <a href="/plan/{{ week.plan_id }}/calendar" class="nav-item"><span class="ni">🗓️</span> Calendar</a>
+    <a href="/plan/{{ week.plan_id }}/dashboard" class="nav-item"><span class="ni">📊</span> Progress</a>
+    <div class="sidebar-section-label" style="margin-top:12px;">Current Week</div>
+    <span class="nav-item active" style="cursor:default;">
+      <span class="ni">📆</span>
+      {{ week.title[:22] }}{% if week.title|length > 22 %}…{% endif %}
+    </span>
+    <div class="sidebar-section-label" style="margin-top:12px;">Account</div>
+    <a href="/create" class="nav-item"><span class="ni">➕</span> New Plan</a>
+    <a href="#" class="nav-item"><span class="ni">⚙️</span> Settings</a>
+  </nav>
+  <div class="sidebar-bottom">
+    <div class="mot-title">🔥 Keep Going!</div>
+    <div class="mot-text">Small steps every day lead to big results.</div>
+    <div class="mot-bar-bg">
+      <div class="mot-bar-fill" id="mot-fill" style="width:0%"></div>
+    </div>
+    <div class="mot-bar-label" id="mot-label">0%</div>
+  </div>
+</div>
+
+<div class="main-area">
+  <div class="topheader">
+    <div class="topheader-left">
+      <div class="greeting">{{ week.title }}</div>
+      <div class="greeting-sub">Tick each day when you complete it</div>
+    </div>
+    <div class="topheader-right">
+      <div class="icon-btn">🌙</div>
+      <div class="avatar">S</div>
+      <a href="/plan/{{ week.plan_id }}/dashboard" class="btn btn-outline btn-sm">📊 Progress</a>
+    </div>
+  </div>
+
+  <div class="page-content">
+
+    <div class="breadcrumb">
+      <a href="/plan/{{ week.plan_id }}/weeks" class="back-btn">
+        <svg viewBox="0 0 16 16" fill="currentColor"><path d="M9.78 12.78a.75.75 0 0 1-1.06 0L4.47 8.53a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 1 1 1.06 1.06L6.06 8l3.72 3.72a.75.75 0 0 1 0 1.06z"/></svg>
+        Back to Weeks
+      </a>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb"><a href="/">Dashboard</a></span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb"><a href="/plan/{{ week.plan_id }}/weeks">Weeks</a></span>
+      <span class="bc-sep">/</span>
+      <span class="bc-crumb current">{{ week.title }}</span>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <h2>Day Tracker</h2>
+        <span id="progress-text" style="font-size:13px;color:var(--text-3);font-weight:600;"></span>
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-bg">
+          <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+        </div>
+      </div>
+
+      <div id="day-list" style="margin-top:16px;">
+        {% if days %}
+          {% for day in days %}
+          <div class="day-track-row" id="day-row-{{ day.id }}">
+            <input type="checkbox" id="cb-{{ day.id }}"
+              {% if day.status == 'completed' %}checked{% endif %}
+              onchange="toggleDay({{ day.id }}, this.checked)">
+            <label for="cb-{{ day.id }}" class="day-track-label {% if day.status == 'completed' %}done{% endif %}">
+              <span class="day-num-tag">Day {{ day.day_number }}</span>{{ day.title }}
+            </label>
+            <span class="badge {% if day.status == 'pending' %}pending{% endif %}" id="badge-{{ day.id }}">
+              {{ day.status }}
+            </span>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="empty">No days yet. Add one below.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header"><h2>Add Day</h2></div>
+      <div class="add-row">
+        <input type="text" id="day-input" placeholder="e.g. HTTP Methods & Status Codes">
+        <button class="btn btn-success" onclick="addDay()">+ Add Day</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const weekId = {{ week.id }};
+const planId = {{ week.plan_id }};
+
+function updateProgress() {
+  const boxes = document.querySelectorAll('#day-list input[type=checkbox]');
+  const total = boxes.length;
+  const done  = [...boxes].filter(b => b.checked).length;
+  document.getElementById('progress-text').textContent = `${done} / ${total} days completed`;
+  document.getElementById('progress-fill').style.width = total ? `${Math.round(done/total*100)}%` : '0%';
+  document.getElementById('mot-fill').style.width  = total ? `${Math.round(done/total*100)}%` : '0%';
+  document.getElementById('mot-label').textContent = total ? `${Math.round(done/total*100)}%` : '0%';
+}
+
+async function toggleDay(id, checked) {
+  const status = checked ? 'completed' : 'pending';
+  await fetch(`/day/${id}`, {
+    method: 'PUT', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({status})
+  });
+  document.querySelector(`label[for="cb-${id}"]`).className =
+    `day-track-label${checked ? ' done' : ''}`;
+  const badge = document.getElementById(`badge-${id}`);
+  badge.textContent = status;
+  badge.className   = `badge${checked ? '' : ' pending'}`;
+  updateProgress();
+}
+
+async function addDay() {
+  const title = document.getElementById('day-input').value.trim();
+  if (!title) return;
+  await fetch('/day', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({title, week_id: weekId})
+  });
+  location.reload();
+}
+
+updateProgress();
+</script>
+</body>
+</html>
