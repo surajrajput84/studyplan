@@ -47,19 +47,6 @@ def get_collection(name):
     
     return _collections_cache[name]
 
-# Collection accessors
-@property
-def users_collection():
-    return get_collection('users')
-
-@property
-def plans_collection():
-    return get_collection('plans')
-
-@property  
-def activities_collection():
-    return get_collection('activities')
-
 class User:
     def __init__(self, username, email, password=None, _id=None, created_at=None):
         self.id = str(_id) if _id else None
@@ -248,6 +235,3 @@ class Activity:
     def get_recent(user_id, limit=5):
         activities_coll = get_collection('activities')
         return list(activities_coll.find({'user_id': user_id}).sort('created_at', -1).limit(limit))
-
-# Export collection getter for backward compatibility
-plans_collection = get_collection('plans')

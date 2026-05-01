@@ -249,7 +249,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - GitHub: [@yourusername](https://github.com/yourusername)
 - LinkedIn: [Your LinkedIn](https://linkedin.com/in/yourprofile)
 
-## 🙏 Acknowledgments
+## 🙏 Acknowledgmentsgit add .
 
 - [Flask](https://flask.palletsprojects.com/) - Web framework
 - [MongoDB](https://www.mongodb.com/) - Database

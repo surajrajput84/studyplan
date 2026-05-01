@@ -3,9 +3,10 @@ import re
 
 def parse_plan_text(text, plan_id, Week, Day, start_date):
     """Parse plan text and add weeks/days to MongoDB plan"""
-    from models_mongo import plans_collection
+    from models_mongo import get_collection
     from bson import ObjectId
     
+    plans_collection = get_collection('plans')
     lines = [l.strip() for l in text.split('\n') if l.strip()]
     current_week = None
     current_date = start_date
