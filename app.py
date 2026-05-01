@@ -22,6 +22,12 @@ def load_user(user_id):
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', 'AIzaSyDdQ4usMeVV04WGDCWzuxLGFTavY1a03Ic')
 _gemini_client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
+# ── Favicon Route ────────────────────────────────────────────
+@app.route('/favicon.ico')
+@app.route('/favicon.png')
+def favicon():
+    return '', 204  # No content
+
 def _build_prompt(subject: str, days: int, hours: float) -> str:
     if hours < 1.5:
         depth_rule = 'Add "(overview)" after every topic.'
