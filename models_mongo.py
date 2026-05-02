@@ -16,13 +16,22 @@ _collections_cache = {}
 def get_db():
     global _client, _db
     if _db is None:
-        _client = MongoClient(
-            MONGO_URI,
-            serverSelectionTimeoutMS=5000,
-            tlsCAFile=certifi.where(),
-            tls=True,
-            tlsAllowInvalidCertificates=False
-        )
+        # Check if using MongoDB Atlas (cloud) or local
+        is_atlas = 'mongodb+srv://' in MONGO_URI or 'mongodb.net' in MONGO_URI
+        
+        if is_atlas:
+            # Atlas requires SSL/TLS
+            _client = MongoClient(
+                MONGO_URI,
+                serverSelectionTimeoutMS=5000,
+                tlsCAFile=certifi.where(),
+                tls=True,
+                tlsAllowInvalidCertificates=False
+            )
+        else:
+            # Local MongoDB - no SSL
+            _client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+        
         _db = _client['study_planner']
     return _db
 

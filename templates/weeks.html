@@ -69,13 +69,38 @@
 
     {% if weeks %}
       {% for week in weeks %}
-      <div class="row-item">
-        <div class="row-num">W{{ week.week_number }}</div>
-        <div class="row-info">
-          <div class="row-title">{{ week.title }}</div>
-          <div class="row-meta" id="meta-w{{ week.id }}">Loading…</div>
+      <div class="card" style="margin-bottom:20px;">
+        <div class="card-header">
+          <h2>{{ week.title }}</h2>
+          <span style="font-size:13px;color:var(--text-3);font-weight:600;" id="meta-w{{ week.week_number }}">Loading…</span>
         </div>
-        <a href="/week/{{ week.id }}/days" class="btn btn-primary btn-sm">Track Days →</a>
+        <div class="progress-wrap" style="margin-bottom:16px;">
+          <div class="progress-bg">
+            <div class="progress-fill" id="prog-w{{ week.week_number }}" style="width:0%"></div>
+          </div>
+        </div>
+        
+        {% if week.days %}
+        <div id="day-list-w{{ week.week_number }}">
+          {% for day in week.days %}
+          <div class="day-track-row">
+            <input type="checkbox" id="cb-{{ plan.id }}-{{ week.week_number }}-{{ day.day_number }}"
+              {% if day.status == 'completed' %}checked{% endif %}
+              onchange="toggleDay('{{ plan.id }}', {{ week.week_number }}, {{ day.day_number }}, this.checked)">
+            <label for="cb-{{ plan.id }}-{{ week.week_number }}-{{ day.day_number }}" 
+              class="day-track-label {% if day.status == 'completed' %}done{% endif %}">
+              <span class="day-num-tag">Day {{ day.day_number }}</span>{{ day.title }}
+            </label>
+            <span class="badge {% if day.status == 'pending' %}pending{% endif %}" 
+              id="badge-{{ plan.id }}-{{ week.week_number }}-{{ day.day_number }}">
+              {{ day.status }}
+            </span>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="empty" style="margin:16px 0;">No days in this week yet.</p>
+        {% endif %}
       </div>
       {% endfor %}
     {% else %}
@@ -98,16 +123,47 @@
 
 <script>
 const planId = '{{ plan.id }}';
+
 async function loadMeta() {
   const res  = await fetch(`/progress/${planId}`);
   const data = await res.json();
   document.getElementById('mot-fill').style.width = data.percent + '%';
   document.getElementById('mot-label').textContent = data.percent + '%';
   data.weeks.forEach(w => {
-    const el = document.getElementById(`meta-w${w.week_id}`);
+    const el = document.getElementById(`meta-w${w.week_number}`);
+    const prog = document.getElementById(`prog-w${w.week_number}`);
     if (el) el.textContent = `${w.completed} / ${w.total} days completed · ${w.percent}%`;
+    if (prog) prog.style.width = w.percent + '%';
   });
 }
+
+async function toggleDay(planId, weekNum, dayNum, checked) {
+  const status = checked ? 'completed' : 'pending';
+  const cbId = `${planId}-${weekNum}-${dayNum}`;
+  
+  try {
+    await fetch(`/day/${planId}/${weekNum}/${dayNum}`, {
+      method: 'PUT', 
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({status})
+    });
+    
+    document.querySelector(`label[for="cb-${cbId}"]`).className =
+      `day-track-label${checked ? ' done' : ''}`;
+    const badge = document.getElementById(`badge-${cbId}`);
+    badge.textContent = status;
+    badge.className   = `badge${checked ? '' : ' pending'}`;
+    
+    // Reload progress
+    await loadMeta();
+  } catch (err) {
+    console.error('Error updating day:', err);
+    alert('Failed to update day status');
+    // Revert checkbox
+    document.getElementById(`cb-${cbId}`).checked = !checked;
+  }
+}
+
 async function addWeek() {
   const title = document.getElementById('week-title').value.trim();
   if (!title) return;
@@ -117,6 +173,7 @@ async function addWeek() {
   });
   location.reload();
 }
+
 loadMeta();
 </script>
 </body>

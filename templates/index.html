@@ -226,7 +226,7 @@ function renderPlans(plans) {
         <div class="plan-card-actions">
           <a href="/plan/${p.id}/weeks" class="btn btn-primary btn-sm">Open →</a>
           <a href="/plan/${p.id}/dashboard" class="btn btn-ghost btn-sm">📊 Stats</a>
-          <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id},'${p.title.replace(/'/g,"\\'")}')">🗑</button>
+          <button class="btn btn-danger btn-sm" onclick="deletePlan('${p.id}','${p.title.replace(/'/g,"\\'")}')">🗑</button>
         </div>
       </div>
     </div>`).join('');
@@ -334,8 +334,19 @@ function changeMonth(dir) {
 // ── Delete plan ───────────────────────────────────────
 async function deletePlan(id, title) {
   if (!confirm(`Delete "${title}"?\n\nAll weeks and days will be permanently removed.`)) return;
-  await fetch(`/plan/${id}`, {method: 'DELETE'});
-  location.reload();
+  
+  try {
+    const res = await fetch(`/plan/${id}`, {method: 'DELETE'});
+    if (res.ok) {
+      // Remove the plan card from UI immediately
+      location.reload();
+    } else {
+      alert('Failed to delete plan. Please try again.');
+    }
+  } catch (err) {
+    console.error('Delete error:', err);
+    alert('Error deleting plan. Please try again.');
+  }
 }
 
 // ── Init ──────────────────────────────────────────────

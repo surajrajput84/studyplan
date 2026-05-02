@@ -215,78 +215,94 @@ def dashboard_page(plan_id):
 @app.route('/dashboard-data', methods=['GET'])
 @login_required
 def dashboard_data():
-    plans = StudyPlan.find_by_user(current_user.id)
-    
-    all_days = []
-    for p in plans:
-        for w in p.get('weeks', []):
-            all_days.extend(w.get('days', []))
-    
-    total = len(all_days)
-    done = sum(1 for d in all_days if d.get('status') == 'completed')
-    today = date.today().isoformat()
-    
-    plans_data = []
-    today_day = None
-    
-    for p in plans:
-        p_total = p_done = 0
-        weeks_data = []
+    try:
+        plans = StudyPlan.find_by_user(current_user.id)
+        print(f"DEBUG: Found {len(plans)} plans for user {current_user.id}")
         
-        for w in p.get('weeks', []):
-            w_days = w.get('days', [])
-            w_total = len(w_days)
-            w_done = sum(1 for d in w_days if d.get('status') == 'completed')
+        all_days = []
+        for p in plans:
+            for w in p.get('weeks', []):
+                all_days.extend(w.get('days', []))
+        
+        total = len(all_days)
+        done = sum(1 for d in all_days if d.get('status') == 'completed')
+        today = date.today().isoformat()
+        
+        plans_data = []
+        today_day = None
+        
+        for p in plans:
+            p_total = p_done = 0
+            weeks_data = []
             
-            weeks_data.append({
-                'week_number': w['week_number'],
-                'title': w['title'],
-                'total': w_total,
-                'completed': w_done,
-                'percent': round(w_done / w_total * 100) if w_total else 0,
-                'days': w_days
+            for w in p.get('weeks', []):
+                w_days = w.get('days', [])
+                w_total = len(w_days)
+                w_done = sum(1 for d in w_days if d.get('status') == 'completed')
+                
+                weeks_data.append({
+                    'week_number': w['week_number'],
+                    'title': w['title'],
+                    'total': w_total,
+                    'completed': w_done,
+                    'percent': round(w_done / w_total * 100) if w_total else 0,
+                    'days': w_days
+                })
+                
+                p_total += w_total
+                p_done += w_done
+                
+                for d in w_days:
+                    if d.get('date') == today and not today_day:
+                        today_day = {**d, 'plan_title': p['title'], 'plan_id': str(p['_id'])}
+            
+            plans_data.append({
+                'id': str(p['_id']),
+                'title': p['title'],
+                'subject': p['subject'],
+                'description': p.get('description', ''),
+                'created_at': p['created_at'].strftime('%b %d, %Y'),
+                'total': p_total,
+                'completed': p_done,
+                'percent': round(p_done / p_total * 100, 1) if p_total else 0,
+                'weeks': weeks_data
             })
-            
-            p_total += w_total
-            p_done += w_done
-            
-            for d in w_days:
-                if d.get('date') == today and not today_day:
-                    today_day = {**d, 'plan_title': p['title'], 'plan_id': str(p['_id'])}
         
-        plans_data.append({
-            'id': str(p['_id']),
-            'title': p['title'],
-            'subject': p['subject'],
-            'description': p.get('description', ''),
-            'created_at': p['created_at'].strftime('%b %d, %Y'),
-            'total': p_total,
-            'completed': p_done,
-            'percent': round(p_done / p_total * 100, 1) if p_total else 0,
-            'weeks': weeks_data
+        completed_dates = list({d.get('date') for d in all_days if d.get('status') == 'completed' and d.get('date')})
+        
+        activities = Activity.get_recent(current_user.id)
+        activity_data = [{
+            'message': a['message'],
+            'plan': a['plan_title'],
+            'time': _time_ago(a['created_at'])
+        } for a in activities]
+        
+        result = {
+            'stats': {
+                'plans': len(plans),
+                'total_days': total,
+                'completed': done,
+                'percent': round(done / total * 100, 1) if total else 0
+            },
+            'plans': plans_data,
+            'today_day': today_day,
+            'completed_dates': completed_dates,
+            'activities': activity_data
+        }
+        
+        print(f"DEBUG: Returning {len(plans_data)} plans in response")
+        return jsonify(result)
+    except Exception as e:
+        print(f"ERROR in dashboard_data: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'stats': {'plans': 0, 'total_days': 0, 'completed': 0, 'percent': 0},
+            'plans': [],
+            'today_day': None,
+            'completed_dates': [],
+            'activities': []
         })
-    
-    completed_dates = list({d.get('date') for d in all_days if d.get('status') == 'completed' and d.get('date')})
-    
-    activities = Activity.get_recent(current_user.id)
-    activity_data = [{
-        'message': a['message'],
-        'plan': a['plan_title'],
-        'time': _time_ago(a['created_at'])
-    } for a in activities]
-    
-    return jsonify({
-        'stats': {
-            'plans': len(plans),
-            'total_days': total,
-            'completed': done,
-            'percent': round(done / total * 100, 1) if total else 0
-        },
-        'plans': plans_data,
-        'today_day': today_day,
-        'completed_dates': completed_dates,
-        'activities': activity_data
-    })
 
 # ── REST APIs ────────────────────────────────────────────────
 
@@ -318,8 +334,16 @@ def parse_plan():
 @app.route('/plan/<plan_id>', methods=['DELETE'])
 @login_required
 def delete_plan(plan_id):
-    StudyPlan.delete(plan_id, current_user.id)
-    return jsonify({'message': 'Plan deleted'})
+    try:
+        print(f"DELETE request for plan_id: {plan_id}, user: {current_user.id}")
+        result = StudyPlan.delete(plan_id, current_user.id)
+        print(f"Delete successful for plan_id: {plan_id}")
+        return jsonify({'message': 'Plan deleted', 'success': True}), 200
+    except Exception as e:
+        print(f"Error deleting plan {plan_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e), 'success': False}), 500
 
 @app.route('/plans', methods=['GET'])
 @login_required
